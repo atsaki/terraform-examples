@@ -1,0 +1,54 @@
+Dotenv.load
+
+Vagrant.configure("2") do |config|
+
+  config.vm.box = "idcfcloud_ubuntu_14.04"
+
+  config.ssh.username         = "root"
+  config.ssh.private_key_path = "#{ENV['VAGRANT_SSH_PRIVATE_KEY']}"
+
+  config.vm.define "terraform", primary: true do |terraform|
+    terraform.vm.provider :cloudstack do |cloudstack, override|
+      cloudstack.displayname = "terraform"
+      cloudstack.pf_ip_address_id = "#{ENV['CLOUDSTACK_PF_IP_ADDRESS_ID']}"
+      cloudstack.service_offering_name = "light.S2"
+      cloudstack.pf_public_port   = "22"
+      override.ssh.port           = "22"
+      cloudstack.pf_private_port  = "22"
+      cloudstack.keypair          = "#{ENV['CLOUDSTACK_SSH_KEYPAIR']}"
+    end
+
+    terraform.vm.provision :shell do |s|
+      s.inline = <<-EOS
+        # Install requirements
+        apt-get update -y
+        apt-get install -y build-essential git mercurial
+
+        # Install golang
+        if [ ! -d /usr/local/go ]
+        then
+          curl -O https://storage.googleapis.com/golang/go1.4.linux-amd64.tar.gz
+          tar -C /usr/local -xzf go1.4.linux-amd64.tar.gz
+        fi
+
+        # Set environment variables
+        grep -q GOPATH ~/.bashrc || echo 'export GOPATH=$HOME' >> ~/.bashrc
+        grep -q '/usr/local/go/bin' ~/.bashrc || echo 'export PATH=$PATH:/usr/local/go/bin:$GOPATH/bin' >> ~/.bashrc
+        export GOPATH=$HOME
+        export PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
+
+        # Clone terraform repository
+        if [ ! -d ~/src/github.com/hashicorp/terraform ]
+        then
+          mkdir -p ~/src/github.com/hashicorp
+          cd ~/src/github.com/hashicorp
+          git clone https://github.com/hashicorp/terraform
+        fi
+
+        # Install terraform
+        cd ~/src/github.com/hashicorp/terraform
+        make updatedeps
+      EOS
+    end
+  end
+end
