@@ -47,7 +47,9 @@ Vagrant.configure("2") do |config|
 
         # Install terraform
         cd ~/src/github.com/hashicorp/terraform
+        go get -u github.com/mitchellh/gox
         make updatedeps
+        make dev
       EOS
     end
   end
